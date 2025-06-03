@@ -24,8 +24,8 @@ jobs:
         id: docker_build
         run: |
           # Export variables to tag against GitHub Container Registry
-          #export DOCKER_REGISTRY=ghcr.io
-          #export DOCKER_REPO=${{ github.repository }}
+          export DOCKER_REGISTRY=ghcr.io
+          export DOCKER_REPO=${{ github.repository }}
           ./hooks/run build ${{ matrix.platforms }}
 
       - name: Display docker images
@@ -41,11 +41,11 @@ jobs:
         if: ${{ github.event_name == 'push' && ( github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' ) }}
         run: |
           # Export variables to login and push to DockerHub Registry
-          export DOCKER_LOGIN=${{ secrets.DOCKERHUB_REGISTRY_LOGIN }}
-          export DOCKER_PASSWORD=${{ secrets.DOCKERHUB_REGISTRY_TOKEN }}
-          ./hooks/run push ${{ matrix.platforms }}
-          # Export variables to login and push to GitHub Container Registry
-          #export DOCKER_REGISTRY=ghcr.io
-          #export DOCKER_LOGIN=${{ github.repository_owner }}
-          #export DOCKER_PASSWORD=${{ secrets.GITHUB_REGISTRY_TOKEN }}
+          #export DOCKER_LOGIN=${{ secrets.DOCKERHUB_REGISTRY_LOGIN }}
+          #export DOCKER_PASSWORD=${{ secrets.DOCKERHUB_REGISTRY_TOKEN }}
           #./hooks/run push ${{ matrix.platforms }}
+          # Export variables to login and push to GitHub Container Registry
+          export DOCKER_REGISTRY=ghcr.io
+          export DOCKER_LOGIN=${{ github.repository_owner }}
+          export DOCKER_PASSWORD=${{ secrets.GITHUB_REGISTRY_TOKEN }}
+          ./hooks/run push ${{ matrix.platforms }}

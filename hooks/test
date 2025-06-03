@@ -17,20 +17,20 @@ do
         echo "Starting Test in ${file} for platform ${PLATFORM}..."
 
         # Test container run
-        docker-compose --ansi never -f "${file}" up -d --build && sleep 60
-        docker-compose --ansi never -f "${file}" logs -f "sut"
-        docker-compose --ansi never -f "${file}" ps
-        docker-compose --ansi never -f "${file}" logs --no-color "autodiscover"
-        docker-compose --ansi never -f "${file}" ps "sut" | grep "Exit 0" || exit 1
-        docker-compose --ansi never -f "${file}" down
+        docker compose --ansi never -f "${file}" up -d --build && sleep 60
+        docker compose --ansi never -f "${file}" logs -f "sut"
+        docker compose --ansi never -f "${file}" ps
+        docker compose --ansi never -f "${file}" logs --no-color "autodiscover"
+        docker compose --ansi never -f "${file}" ps "sut" | grep "Exit 0" || exit 1
+        docker compose --ansi never -f "${file}" down
 
         # Test container restart
-        docker-compose --ansi never -f "${file}" up -d --no-build && sleep 60
-        docker-compose --ansi never -f "${file}" logs -f "sut"
-        docker-compose --ansi never -f "${file}" ps
-        docker-compose --ansi never -f "${file}" logs --no-color "autodiscover"
-        docker-compose --ansi never -f "${file}" ps "sut" | grep "Exit 0" || exit 1
-        docker-compose --ansi never -f "${file}" down -v
+        docker compose --ansi never -f "${file}" up -d --no-build && sleep 60
+        docker compose --ansi never -f "${file}" logs -f "sut"
+        docker compose --ansi never -f "${file}" ps
+        docker compose --ansi never -f "${file}" logs --no-color "autodiscover"
+        docker compose --ansi never -f "${file}" ps "sut" | grep "Exit 0" || exit 1
+        docker compose --ansi never -f "${file}" down -v
 
     done
 done
