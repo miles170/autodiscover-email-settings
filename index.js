@@ -1,13 +1,35 @@
 "use strict";
 
+const fs		= require("fs");
 const path		= require("path");
-const app		= require("koa")();
-const swig		= require("koa-swig");
-const body		= require("koa-buddy");
-const router	= require("koa-router")();
+const util		= require("util");
+const Koa		= require("koa");
+const Router	= require("koa-router");
+const swig		= require("swig-templates");
+const xmlParser	= require("xml-parser");
 const settings	= require("./settings.js");
 
+const app		= new Koa();
+const router	= new Router();
+
+swig.setDefaults({
+	autoescape: true,
+	cache: "memory",
+	locals: settings
+});
+
+const renderFile = util.promisify(swig.renderFile);
+
+app.context.render = async function(view, options = {}) {
+	const file = path.extname(view) ? view : `${view}.xml`;
+	const filePath = path.join(__dirname, "views", file);
+	this.body = await renderFile(filePath, { ...settings, ...this.state, ...options });
+};
+
 function findChild(name, children, def = null) {
+	if (!children) {
+		return def;
+	}
 	for (let child of children) {
 		if (child.name === name) {
 			return child;
@@ -17,30 +39,30 @@ function findChild(name, children, def = null) {
 }
 
 // Microsoft Outlook / Apple Mail
-function *autodiscover() {
-	this.set("Content-Type", "application/xml");
+async function autodiscover(ctx) {
+	ctx.set("Content-Type", "application/xml");
 
-	const request	= this.request.body && this.request.body.root ? 
-		findChild("Request", this.request.body.root.children) : 
+	const request	= ctx.request.body && ctx.request.body.root ?
+		findChild("Request", ctx.request.body.root.children) :
 		null;
-	const schema	= request !== null ? 
-		findChild("AcceptableResponseSchema", request.children) : 
+	const schema	= request !== null ?
+		findChild("AcceptableResponseSchema", request.children) :
 		null;
-	const xmlns		= schema !== null ? 
-		schema.content : 
+	const xmlns		= schema !== null ?
+		schema.content :
 		"http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006";
 
-	let email		= request !== null ? 
-		findChild("EMailAddress", request.children) : 
+	let email		= request !== null ?
+		findChild("EMailAddress", request.children) :
 		null;
 
 	let username;
 	let domain;
-	if ( email === null || email.content === null ) {
+	if (email === null || email.content === null) {
 		email		= "";
 		username	= "";
 		domain		= settings.domain;
-	} else if ( ~email.content.indexOf("@") ) {
+	} else if (~email.content.indexOf("@")) {
 		email		= email.content;
 		username	= email.split("@")[0];
 		domain		= email.split("@")[1];
@@ -58,7 +80,7 @@ function *autodiscover() {
 	const popssl	= settings.pop.socket === "SSL" ? "on" : "off";
 	const smtpssl	= settings.smtp.socket === "SSL" ? "on" : "off";
 
-	yield this.render("autodiscover", {
+	await ctx.render("autodiscover", {
 		schema: xmlns,
 		email,
 		username,
@@ -79,25 +101,24 @@ router.post("/Autodiscover/Autodiscover.xml", autodiscover);
 
 
 // Thunderbird
-router.get("/mail/config-v1.1.xml", function *autoconfig() {
-	this.set("Content-Type", "application/xml");
-	yield this.render("autoconfig");
+router.get("/mail/config-v1.1.xml", async (ctx) => {
+	ctx.set("Content-Type", "application/xml");
+	await ctx.render("autoconfig");
 });
 
 
 // iOS / Apple Mail (/email.mobileconfig?email=username@domain.com or /email.mobileconfig?email=username)
-router.get("/email.mobileconfig", function *autoconfig() {
-	let email = this.request.query.email;
+router.get("/email.mobileconfig", async (ctx) => {
+	let email = ctx.query.email;
 
 	if (!email) {
-		this.status = 400;
-
+		ctx.status = 400;
 		return;
 	}
 
 	let username;
 	let domain;
-	if ( ~email.indexOf("@") ) {
+	if (~email.indexOf("@")) {
 		username	= email.split("@")[0];
 		domain		= email.split("@")[1];
 	} else {
@@ -113,10 +134,10 @@ router.get("/email.mobileconfig", function *autoconfig() {
 	const smtpssl	= settings.smtp.socket === "SSL" || settings.smtp.socket === "STARTTLS" ? "true" : "false";
 	const ldapssl	= settings.ldap.socket === "SSL" || settings.ldap.port === "636" ? "true" : "false";
 
-	this.set("Content-Type", "application/x-apple-aspen-config; charset=utf-8");
-	this.set("Content-Disposition", `attachment; filename="${filename}"`);
+	ctx.set("Content-Type", "application/x-apple-aspen-config; charset=utf-8");
+	ctx.set("Content-Disposition", `attachment; filename="${filename}"`);
 
-	yield this.render("mobileconfig", {
+	await ctx.render("mobileconfig", {
 		email,
 		username,
 		domain,
@@ -129,35 +150,38 @@ router.get("/email.mobileconfig", function *autoconfig() {
 
 
 // Generic support page
-router.get("/", function *index() {
-	yield this.render("index.html");
+router.get("/", async (ctx) => {
+	await ctx.render("index.html");
 });
 
-router.get("/favicon.ico", function *icon() {
-	yield this.render("favicon.ico");
+router.get("/favicon.ico", async (ctx) => {
+	ctx.type = "image/x-icon";
+	ctx.body = fs.createReadStream(path.join(__dirname, "views", "favicon.ico"));
 });
 
-app.context.render = swig({
-	root: path.join(__dirname, "views"),
-	autoescape: true,
-	cache: "memory",
-	ext: "xml",
-	locals: settings
-});
-
-app.use(function *fixContentType(next) {
-	let type = this.request.headers["content-type"];
-
-	if (type && type.indexOf("text/xml") === 0) {
-		let newType = type.replace("text/xml", "application/xml");
-
-		this.request.headers["content-type"] = newType;
+// XML body parser middleware
+app.use(async (ctx, next) => {
+	if (ctx.method === "POST" && (ctx.is("xml") || ctx.is("text/xml") || ctx.is("application/xml"))) {
+		const raw = await new Promise((resolve, reject) => {
+			let data = "";
+			ctx.req.setEncoding("utf8");
+			ctx.req.on("data", (chunk) => {
+				data += chunk;
+			});
+			ctx.req.on("end", () => {
+				resolve(data);
+			});
+			ctx.req.on("error", reject);
+		});
+		try {
+			ctx.request.body = xmlParser(raw);
+		} catch {
+			ctx.request.body = null;
+		}
 	}
-
-	yield next;
+	await next();
 });
 
-app.use(body());
 app.use(router.routes());
 app.use(router.allowedMethods());
 

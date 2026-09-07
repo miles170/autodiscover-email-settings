@@ -8,7 +8,7 @@
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=4.0.0"
+    "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",
@@ -33,11 +33,9 @@
     "ldap"
   ],
   "dependencies": {
-    "koa": "^1.0.0",
-    "koa-buddy": "^0.1.0",
-    "koa-router": "^5.1.2",
-    "koa-swig": "^2.0.0",
-    "minimist": "^1.2.6",
-    "qs": "^6.10.3"
+    "koa": "^3.2.1",
+    "koa-router": "^14.0.0",
+    "swig-templates": "^2.0.3",
+    "xml-parser": "^1.2.1"
   }
 }
