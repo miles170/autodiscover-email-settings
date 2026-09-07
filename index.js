@@ -27,6 +27,16 @@ app.context.render = async function(view, options = {}) {
 	this.body = await renderFile(filePath, { ...settings, ...this.state, ...options });
 };
 
+function formatRequestBody(rawBody) {
+	const redacted = rawBody.replace(
+		/<((?:[\w.-]+:)?(?:password|secret|token))(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/gi,
+		"<$1>[REDACTED]</$1>"
+	);
+	const limit = 2000;
+	const body = redacted.length > limit ? `${redacted.slice(0, limit)}…` : redacted;
+	return JSON.stringify(body);
+}
+
 async function accessLog(ctx, next) {
 	const startedAt = process.hrtime.bigint();
 	let requestError;
@@ -43,6 +53,13 @@ async function accessLog(ctx, next) {
 		const detail = requestError ?
 			(requestError instanceof Error ? requestError.message : String(requestError)) :
 			issue;
+		const metadata = [];
+		if (ctx.state.displayName !== undefined) {
+			metadata.push(`displayName=${JSON.stringify(ctx.state.displayName)}`);
+		}
+		if ((requestError || issue) && ctx.state.rawRequestBody !== undefined) {
+			metadata.push(`body=${formatRequestBody(ctx.state.rawRequestBody)}`);
+		}
 		const message = [
 			"[access]",
 			ctx.ip || "-",
@@ -50,7 +67,8 @@ async function accessLog(ctx, next) {
 			ctx.path,
 			status,
 			`${duration.toFixed(1)}ms`,
-			detail ? `- ${detail}` : ""
+			detail ? `- ${detail}` : "",
+			...metadata
 		].filter(Boolean).join(" ");
 
 		if (requestError) {
@@ -127,6 +145,7 @@ async function autodiscover(ctx) {
 	}
 
 	displayName = displayName || settings.info.name || email;
+	ctx.state.displayName = displayName;
 
 	await ctx.render("autodiscover", {
 		schema: xmlns,
@@ -211,7 +230,7 @@ router.get("/favicon.ico", async (ctx) => {
 // XML body parser middleware
 app.use(accessLog);
 app.use(async (ctx, next) => {
-	if (ctx.method === "POST" && (ctx.is("xml") || ctx.is("text/xml") || ctx.is("application/xml"))) {
+	if (ctx.method === "POST") {
 		const raw = await new Promise((resolve, reject) => {
 			let data = "";
 			ctx.req.setEncoding("utf8");
@@ -223,11 +242,14 @@ app.use(async (ctx, next) => {
 			});
 			ctx.req.on("error", reject);
 		});
-		try {
-			ctx.request.body = xmlParser(raw);
-		} catch {
-			ctx.request.body = null;
-			ctx.state.accessWarning = "invalid XML body";
+		ctx.state.rawRequestBody = raw;
+		if (ctx.is("xml") || ctx.is("text/xml") || ctx.is("application/xml")) {
+			try {
+				ctx.request.body = xmlParser(raw);
+			} catch {
+				ctx.request.body = null;
+				ctx.state.accessWarning = "invalid XML body";
+			}
 		}
 	}
 	await next();

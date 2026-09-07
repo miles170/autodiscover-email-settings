@@ -50,6 +50,7 @@ test("autodiscover resolves DisplayName", async (t) => {
 
 		assert.strictEqual(testRequest.rendered.view, "autodiscover");
 		assert.strictEqual(testRequest.rendered.options.displayName, "Miles");
+		assert.strictEqual(testRequest.ctx.state.displayName, "Miles");
 	});
 
 	await t.test("falls back to the company name", async () => {
@@ -143,9 +144,17 @@ test("accessLog", async (t) => {
 	});
 
 	await t.test("warns when a request cannot be handled", async () => {
-		const ctx = context({ state: { accessWarning: "invalid XML body" } });
+		const ctx = context({
+			state: {
+				accessWarning: "invalid XML body",
+				displayName: "Fallback Company",
+				rawRequestBody: "<Request>\n  <Password>secret</Password>\n</Request>"
+			}
+		});
 		const message = await capture("warn", () => accessLog(ctx, async () => {}));
-		assert.match(message, / 200 \d+\.\dms - invalid XML body$/);
+		assert.ok(message.endsWith(
+			'- invalid XML body displayName="Fallback Company" body="<Request>\\n  <Password>[REDACTED]</Password>\\n</Request>"'
+		));
 	});
 
 	await t.test("identifies unmatched routes", async () => {

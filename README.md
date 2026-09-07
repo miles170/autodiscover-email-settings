@@ -312,7 +312,7 @@ environment:
 
 ### Access logs
 
-Each HTTP request logs its source IP, method, path, response status, and duration. Unmatched routes, invalid XML, requests without an email address, and unexpected errors are logged at warning or error level with a reason. Request bodies and credentials are never logged.
+Each HTTP request logs its source IP, method, path, response status, and duration. Autodiscover requests also log the `DisplayName` returned to the client. Unmatched routes, invalid XML, requests without an email address, and unexpected errors are logged at warning or error level with a reason and the request body. Logged bodies are escaped onto one line, limited to 2,000 characters, and redact password, secret, and token elements.
 
 ## Credits
 
