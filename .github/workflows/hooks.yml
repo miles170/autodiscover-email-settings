@@ -6,8 +6,9 @@ on:
   push:
     branches:
       - main
-      - master
       - develop
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -39,13 +40,40 @@ jobs:
         run: |
           ./hooks/run test ${{ matrix.platforms }}
 
-      - name: Execute CI push hooks
-        id: docker_push
-        if: ${{ github.event_name == 'push' && ( github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' ) }}
-        run: |
-          # Export variables to login and push to GitHub Container Registry
-          export DOCKER_REGISTRY=ghcr.io
-          export DOCKER_REPO=${{ github.repository }}
-          export DOCKER_LOGIN=${{ github.actor }}
-          export DOCKER_PASSWORD=${{ secrets.GITHUB_TOKEN }}
-          ./hooks/run push ${{ matrix.platforms }}
+      - name: Log in to GitHub Container Registry
+        if: ${{ github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == github.event.repository.default_branch) }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        if: ${{ github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == github.event.repository.default_branch) }}
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        if: ${{ github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == github.event.repository.default_branch) }}
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push image
+        if: ${{ github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == github.event.repository.default_branch) }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
