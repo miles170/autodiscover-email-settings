@@ -3,7 +3,7 @@
 # See documentation for details:
 # https://docs.docker.com/docker-hub/builds/advanced/
 
-docker-compose version
+docker compose version
 
 if [ ! -f '.env' ] &&  [ -f '.env_template' ]; then
     echo 'Init docker compose environment variables...'

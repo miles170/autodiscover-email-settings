@@ -12,20 +12,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         platforms: ['linux/amd64'] # Not working yet in GHA (but works locally): linux/arm64,linux/arm/v7,linux/arm/v6
 
     steps:
       - name: Check Out Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Execute CI build hooks
         id: docker_build
         run: |
           # Export variables to tag against GitHub Container Registry
-          #export DOCKER_REGISTRY=ghcr.io
-          #export DOCKER_REPO=${{ github.repository }}
+          export DOCKER_REGISTRY=ghcr.io
+          export DOCKER_REPO=${{ github.repository }}
           ./hooks/run build ${{ matrix.platforms }}
 
       - name: Display docker images
@@ -40,12 +43,9 @@ jobs:
         id: docker_push
         if: ${{ github.event_name == 'push' && ( github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' ) }}
         run: |
-          # Export variables to login and push to DockerHub Registry
-          export DOCKER_LOGIN=${{ secrets.DOCKERHUB_REGISTRY_LOGIN }}
-          export DOCKER_PASSWORD=${{ secrets.DOCKERHUB_REGISTRY_TOKEN }}
-          ./hooks/run push ${{ matrix.platforms }}
           # Export variables to login and push to GitHub Container Registry
-          #export DOCKER_REGISTRY=ghcr.io
-          #export DOCKER_LOGIN=${{ github.repository_owner }}
-          #export DOCKER_PASSWORD=${{ secrets.GITHUB_REGISTRY_TOKEN }}
-          #./hooks/run push ${{ matrix.platforms }}
+          export DOCKER_REGISTRY=ghcr.io
+          export DOCKER_REPO=${{ github.repository }}
+          export DOCKER_LOGIN=${{ github.actor }}
+          export DOCKER_PASSWORD=${{ secrets.GITHUB_TOKEN }}
+          ./hooks/run push ${{ matrix.platforms }}

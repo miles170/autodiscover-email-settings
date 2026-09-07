@@ -2,7 +2,7 @@
 	"name": "autodiscover-email-settings",
 	"description": "Provides IMAP/SMTP/LDAP Autoconfiguration capabilities for Microsoft Outlook, Apple Mail, and Thunderbird",
 	"website": "https://monogramm.io",
-	"repository": "https://github.com/monogramm/autodiscover-email-settings",
+	"repository": "https://github.com/miles170/autodiscover-email-settings",
 	"keywords": ["monogramm", "autoconfigure", "autoconf", "autodiscover", "outlook", "thunderbird", "apple mail", "imap", "smtp", "ldap"],
 	"addons": [
 		"papertrail"

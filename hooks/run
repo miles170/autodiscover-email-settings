@@ -19,7 +19,7 @@ BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 export PLATFORMS
 PLATFORMS=${2:-linux/amd64}
 
-export DOCKER_REPO=${DOCKER_REPO:-monogramm/autodiscover-email-settings}
+export DOCKER_REPO=${DOCKER_REPO:-${GITHUB_REPOSITORY:-miles170/autodiscover-email-settings}}
 export DOCKERFILE_PATH="Dockerfile"
 export DOCKER_TAG=${DOCKER_TAG:-latest}
 
