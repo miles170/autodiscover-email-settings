@@ -3,13 +3,13 @@ FROM node:lts-alpine
 EXPOSE 8000
 
 WORKDIR /app
-COPY package.json yarn.lock index.js settings.js /app/
+COPY package.json package-lock.json index.js settings.js /app/
 
 RUN set -ex; \
     node --version; \
-    yarn --version; \
-    yarn --prod; \
-    yarn cache clean
+    npm --version; \
+    npm ci --omit=dev; \
+    npm cache clean --force
 
 COPY views /app/views
 
