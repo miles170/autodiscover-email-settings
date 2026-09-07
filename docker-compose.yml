@@ -24,6 +24,11 @@ services:
       - LDAP_USER_FIELD=uid
       - LDAP_USER_BASE=ou=People,dc=ldap,dc=example,dc=com
       - LDAP_SEARCH=(|(objectClass=PostfixBookMailAccount))
+      # LDAP server-side lookup for Autodiscover DisplayName (optional)
+      # - LDAP_BIND_DN=cn=autodiscover,ou=ServiceAccounts,dc=example,dc=com
+      # - LDAP_BIND_PASSWORD=secret
+      # - LDAP_NAME_FIELD=cn
+      # - LDAP_FILTER=(&(objectClass=PostfixBookMailAccount)(mail=%{email}))
       - PROFILE_IDENTIFIER=com.example.autodiscover
       - PROFILE_UUID=92943D26-CAB3-4086-897D-DC6C0D8B1E86
       - MAIL_UUID=7A981A9E-D5D0-4EF8-87FE-39FD6A506FAC

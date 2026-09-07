@@ -3,7 +3,7 @@ FROM node:lts-alpine
 EXPOSE 8000
 
 WORKDIR /app
-COPY package.json package-lock.json index.js settings.js /app/
+COPY package.json package-lock.json index.js settings.js ldap.js /app/
 
 RUN set -ex; \
     node --version; \

@@ -76,6 +76,22 @@
 			"description": "Your LDAP User Base DN",
 			"value": "ou=People,dc=ldap,dc=example,dc=com"
 		},
+		"LDAP_BIND_DN": {
+			"description": "Your LDAP Bind DN for server-side lookup",
+			"value": ""
+		},
+		"LDAP_BIND_PASSWORD": {
+			"description": "Your LDAP Bind Password for server-side lookup",
+			"value": ""
+		},
+		"LDAP_NAME_FIELD": {
+			"description": "Your LDAP attribute for Outlook DisplayName",
+			"value": "cn"
+		},
+		"LDAP_FILTER": {
+			"description": "Your custom LDAP search filter for user lookup",
+			"value": ""
+		},
 		"PROFILE_IDENTIFIER": {
 			"description": "Your mobile profile identifier",
 			"value": "com.example.autodiscover"

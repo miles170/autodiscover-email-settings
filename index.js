@@ -8,6 +8,7 @@ const Router	= require("koa-router");
 const swig		= require("swig-templates");
 const xmlParser	= require("xml-parser");
 const settings	= require("./settings.js");
+const ldap		= require("./ldap.js");
 
 const app		= new Koa();
 const router	= new Router();
@@ -25,6 +26,42 @@ app.context.render = async function(view, options = {}) {
 	const filePath = path.join(__dirname, "views", file);
 	this.body = await renderFile(filePath, { ...settings, ...this.state, ...options });
 };
+
+async function accessLog(ctx, next) {
+	const startedAt = process.hrtime.bigint();
+	let requestError;
+
+	try {
+		await next();
+	} catch (err) {
+		requestError = err;
+		throw err;
+	} finally {
+		const duration = Number(process.hrtime.bigint() - startedAt) / 1e6;
+		const status = requestError ? requestError.status || 500 : ctx.status;
+		const issue = ctx.state.accessWarning || (status === 404 ? "unhandled request" : undefined);
+		const detail = requestError ?
+			(requestError instanceof Error ? requestError.message : String(requestError)) :
+			issue;
+		const message = [
+			"[access]",
+			ctx.ip || "-",
+			ctx.method,
+			ctx.path,
+			status,
+			`${duration.toFixed(1)}ms`,
+			detail ? `- ${detail}` : ""
+		].filter(Boolean).join(" ");
+
+		if (requestError) {
+			console.error(message);
+		} else if (issue || status >= 400) {
+			console.warn(message);
+		} else {
+			console.info(message);
+		}
+	}
+}
 
 function findChild(name, children, def = null) {
 	if (!children) {
@@ -58,7 +95,8 @@ async function autodiscover(ctx) {
 
 	let username;
 	let domain;
-	if (email === null || email.content === null) {
+	if (email === null || typeof email.content !== "string" || !email.content.trim()) {
+		ctx.state.accessWarning ||= "missing EMailAddress";
 		email		= "";
 		username	= "";
 		domain		= settings.domain;
@@ -80,8 +118,19 @@ async function autodiscover(ctx) {
 	const popssl	= settings.pop.socket === "SSL" ? "on" : "off";
 	const smtpssl	= settings.smtp.socket === "SSL" ? "on" : "off";
 
+	let displayName;
+	try {
+		displayName = await ldap.lookupUserName(email);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		ctx.state.accessWarning ||= `LDAP display name lookup failed: ${message}`;
+	}
+
+	displayName = displayName || settings.info.name || email;
+
 	await ctx.render("autodiscover", {
 		schema: xmlns,
+		displayName,
 		email,
 		username,
 		domain,
@@ -160,6 +209,7 @@ router.get("/favicon.ico", async (ctx) => {
 });
 
 // XML body parser middleware
+app.use(accessLog);
 app.use(async (ctx, next) => {
 	if (ctx.method === "POST" && (ctx.is("xml") || ctx.is("text/xml") || ctx.is("application/xml"))) {
 		const raw = await new Promise((resolve, reject) => {
@@ -177,6 +227,7 @@ app.use(async (ctx, next) => {
 			ctx.request.body = xmlParser(raw);
 		} catch {
 			ctx.request.body = null;
+			ctx.state.accessWarning = "invalid XML body";
 		}
 	}
 	await next();
@@ -185,4 +236,8 @@ app.use(async (ctx, next) => {
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-app.listen(process.env.PORT || 8000);
+if (require.main === module) {
+	app.listen(process.env.PORT || 8000);
+}
+
+module.exports = { app, autodiscover, accessLog };

@@ -4,7 +4,7 @@
         <Response
                 xmlns="{{schema}}">
                 <User>
-                        <DisplayName>{{info.name}}</DisplayName>
+                        <DisplayName>{{displayName}}</DisplayName>
                 </User>
                 <Account>
                         <AccountType>email</AccountType>

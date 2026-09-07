@@ -30,7 +30,11 @@ module.exports = {
 		base: process.env.LDAP_BASE,
 		userfield: process.env.LDAP_USER_FIELD,
 		usersbase: process.env.LDAP_USER_BASE,
-		searchfilter: process.env.LDAP_SEARCH
+		searchfilter: process.env.LDAP_SEARCH,
+		binddn: process.env.LDAP_BIND_DN,
+		bindpassword: process.env.LDAP_BIND_PASSWORD,
+		namefield: process.env.LDAP_NAME_FIELD || "cn",
+		filter: process.env.LDAP_FILTER
 	},
 	mobile: {
 		identifier: process.env.PROFILE_IDENTIFIER,

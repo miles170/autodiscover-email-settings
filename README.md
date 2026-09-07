@@ -87,6 +87,11 @@ services:
       - LDAP_USER_FIELD=uid
       - LDAP_USER_BASE=ou=People,dc=ldap,dc=example,dc=com
       - LDAP_SEARCH=(|(objectClass=PostfixBookMailAccount))
+      # LDAP server-side lookup for Autodiscover DisplayName (optional)
+      # - LDAP_BIND_DN=cn=autodiscover,ou=ServiceAccounts,dc=example,dc=com
+      # - LDAP_BIND_PASSWORD=secret
+      # - LDAP_NAME_FIELD=cn
+      # - LDAP_FILTER=(&(objectClass=PostfixBookMailAccount)(mail=%{email}))
       # Apple mobile config identifiers (identifier mandatory to enable)
       - PROFILE_IDENTIFIER=com.example.autodiscover
       - PROFILE_UUID=92943D26-CAB3-4086-897D-DC6C0D8B1E86
@@ -133,6 +138,11 @@ services:
       - LDAP_USER_FIELD=uid
       - LDAP_USER_BASE=ou=People,dc=ldap,dc=example,dc=com
       - LDAP_SEARCH=(|(objectClass=PostfixBookMailAccount))
+      # LDAP server-side lookup for Autodiscover DisplayName (optional)
+      # - LDAP_BIND_DN=cn=autodiscover,ou=ServiceAccounts,dc=example,dc=com
+      # - LDAP_BIND_PASSWORD=secret
+      # - LDAP_NAME_FIELD=cn
+      # - LDAP_FILTER=(&(objectClass=PostfixBookMailAccount)(mail=%{email}))
       # Apple mobile config identifiers (identifier mandatory to enable)
       - PROFILE_IDENTIFIER=com.example.autodiscover
       - PROFILE_UUID=92943D26-CAB3-4086-897D-DC6C0D8B1E86
@@ -246,6 +256,10 @@ Environment="SMTP_SOCKET=SSL"
 #Environment="LDAP_USER_FIELD=uid"
 #Environment="LDAP_USER_BASE=ou=People,dc=ldap,dc=example,dc=com"
 #Environment="LDAP_SEARCH=(|(objectClass=PostfixBookMailAccount))"
+#Environment="LDAP_BIND_DN=cn=autodiscover,ou=ServiceAccounts,dc=example,dc=com"
+#Environment="LDAP_BIND_PASSWORD=secret"
+#Environment="LDAP_NAME_FIELD=cn"
+#Environment="LDAP_FILTER=(&(objectClass=PostfixBookMailAccount)(mail=%{email}))"
 
 # Apple mobile config identifiers (identifier mandatory to enable)
 Environment="PROFILE_IDENTIFIER=com.example.autodiscover"
@@ -260,6 +274,45 @@ Restart=always
 WantedBy=multi-user.target
 
 ```
+
+### LDAP display name lookup
+
+Outlook's Autodiscover response can use a display name read from LDAP instead of the static `COMPANY_NAME`. The lookup searches by the full email address and escapes it according to RFC 4515.
+
+#### Environment variables
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `LDAP_HOST` | Hostname of LDAP server | |
+| `LDAP_PORT` | Port of LDAP server (`636` for LDAPS, `389` for LDAP) | `389` (or `636` if SSL) |
+| `LDAP_SOCKET` | Connection security: `SSL`, `STARTTLS`, or plain | |
+| `LDAP_USER_BASE` | Search base DN for users (falls back to `LDAP_BASE`) | |
+| `LDAP_BASE` | Base DN for LDAP | |
+| `LDAP_BIND_DN` | Bind DN for read-only server lookup | anonymous if unset |
+| `LDAP_BIND_PASSWORD` | Bind password for server lookup | |
+| `LDAP_NAME_FIELD` | LDAP attribute used for Outlook DisplayName | `cn` |
+| `LDAP_FILTER` | Custom search filter; `%{email}` is replaced with the escaped address | `(mail=<email>)` |
+
+When `LDAP_FILTER` has no `%{email}` placeholder, it is combined with the default `(mail=<email>)` filter. A missing user, empty name, connection failure, or timeout falls back to `COMPANY_NAME`, then to the requested email address.
+
+Example:
+
+```yaml
+environment:
+  COMPANY_NAME: Example Company
+  LDAP_HOST: ldap.example.com
+  LDAP_PORT: 636
+  LDAP_SOCKET: SSL
+  LDAP_USER_BASE: ou=People,dc=example,dc=com
+  LDAP_BIND_DN: cn=autodiscover,ou=ServiceAccounts,dc=example,dc=com
+  LDAP_BIND_PASSWORD: secret
+  LDAP_NAME_FIELD: cn
+  LDAP_FILTER: "(&(objectClass=PostfixBookMailAccount)(mail=%{email}))"
+```
+
+### Access logs
+
+Each HTTP request logs its source IP, method, path, response status, and duration. Unmatched routes, invalid XML, requests without an email address, and unexpected errors are logged at warning or error level with a reason. Request bodies and credentials are never logged.
 
 ## Credits
 
