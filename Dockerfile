@@ -18,7 +18,7 @@ CMD ["node", "/app/index"]
 # Arguments to label built container
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
-ARG VERSION=1.4.0
+ARG VERSION=1.5.0
 
 # Container labels (http://label-schema.org/)
 # Container annotations (https://github.com/opencontainers/image-spec)
