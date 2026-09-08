@@ -33,6 +33,9 @@ services:
       - PROFILE_UUID=92943D26-CAB3-4086-897D-DC6C0D8B1E86
       - MAIL_UUID=7A981A9E-D5D0-4EF8-87FE-39FD6A506FAC
       - LDAP_UUID=6ECB6BA9-2208-4ABF-9E60-4E9F4CD7309E
+      # Reverse proxy real IP configuration (optional)
+      # - REAL_IP_HEADER=X-Real-Ip
+      # - REAL_IP_TRUSTED_ADDRESSES=127.0.0.1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
     labels:
       - "traefik.port=8000"
       - "traefik.frontend.rule=Host:autoconfig.example.com,autodiscover.example.com"

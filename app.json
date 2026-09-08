@@ -107,6 +107,14 @@
 		"LDAP_UUID": {
 			"description": "Your ldap profile globally unique ID",
 			"value": "6ECB6BA9-2208-4ABF-9E60-4E9F4CD7309E"
+		},
+		"REAL_IP_HEADER": {
+			"description": "Request header to read client IP from (e.g. X-Real-Ip, X-Forwarded-For)",
+			"value": ""
+		},
+		"REAL_IP_TRUSTED_ADDRESSES": {
+			"description": "Comma-separated list of trusted upstream proxy IPs or CIDRs",
+			"value": ""
 		}
 	}
 }

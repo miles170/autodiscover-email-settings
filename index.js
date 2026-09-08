@@ -1,6 +1,7 @@
 "use strict";
 
 const fs		= require("fs");
+const net		= require("node:net");
 const path		= require("path");
 const util		= require("util");
 const Koa		= require("koa");
@@ -37,8 +38,94 @@ function formatRequestBody(rawBody) {
 	return JSON.stringify(body);
 }
 
+function normalizeIp(ip) {
+	if (!ip) return "";
+	if (ip.startsWith("::ffff:")) return ip.slice(7);
+	return ip;
+}
+
+const matcherCache = new WeakMap();
+
+function buildIpMatcher(trustedList) {
+	if (!trustedList || trustedList.length === 0) return () => true;
+	const blockList = new net.BlockList();
+	for (const raw of trustedList) {
+		const item = normalizeIp(raw.trim());
+		if (item === "*" || item === "all") return () => true;
+		if (item === "loopback") {
+			blockList.addSubnet("127.0.0.0", 8, "ipv4");
+			blockList.addAddress("::1", "ipv6");
+			continue;
+		}
+		const [addr, prefixStr] = item.split("/");
+		const type = net.isIP(addr);
+		if (!type) continue;
+		const family = type === 6 ? "ipv6" : "ipv4";
+		if (prefixStr !== undefined) {
+			const prefix = parseInt(prefixStr, 10);
+			const maxPrefix = type === 6 ? 128 : 32;
+			if (Number.isInteger(prefix) && prefix >= 0 && prefix <= maxPrefix) {
+				blockList.addSubnet(addr, prefix, family);
+			}
+		} else {
+			blockList.addAddress(addr, family);
+		}
+	}
+	return (ip) => {
+		const normalized = normalizeIp(ip);
+		const type = net.isIP(normalized);
+		return Boolean(type && blockList.check(normalized, type === 6 ? "ipv6" : "ipv4"));
+	};
+}
+
+function getIpMatcher(trustedList) {
+	if (!trustedList || trustedList.length === 0) return () => true;
+	let matcher = matcherCache.get(trustedList);
+	if (!matcher) {
+		matcher = buildIpMatcher(trustedList);
+		matcherCache.set(trustedList, matcher);
+	}
+	return matcher;
+}
+
+function getClientIp(ctx, config = settings.realIp) {
+	const rawRemote = ctx.socket?.remoteAddress || ctx.req?.socket?.remoteAddress || ctx.ip || "";
+	const remoteIp = normalizeIp(rawRemote);
+	const header = config?.header;
+	const trusted = config?.trustedAddresses;
+
+	if (!header && (!trusted || trusted.length === 0)) {
+		return remoteIp || ctx.ip || "-";
+	}
+	const isTrusted = getIpMatcher(trusted);
+	if (trusted && trusted.length > 0 && !isTrusted(remoteIp)) {
+		return remoteIp || ctx.ip || "-";
+	}
+	const headerName = header || "X-Forwarded-For";
+	const headerValue = (ctx.get ? ctx.get(headerName) : ctx.headers?.[headerName.toLowerCase()]) || "";
+	if (!headerValue) {
+		return remoteIp || ctx.ip || "-";
+	}
+	if (headerName.toLowerCase() === "x-forwarded-for") {
+		const ips = headerValue.split(",").map((s) => s.trim()).filter(Boolean);
+		if (trusted && trusted.length > 0) {
+			for (let i = ips.length - 1; i >= 0; i--) {
+				if (!isTrusted(ips[i])) {
+					return ips[i];
+				}
+			}
+		}
+		return ips[0] || remoteIp || ctx.ip || "-";
+	}
+	return headerValue.split(",")[0].trim() || remoteIp || ctx.ip || "-";
+}
+
 async function accessLog(ctx, next) {
 	const startedAt = process.hrtime.bigint();
+	const clientIp = getClientIp(ctx);
+	if (ctx.request) {
+		ctx.request.ip = clientIp;
+	}
 	let requestError;
 
 	try {
@@ -62,7 +149,7 @@ async function accessLog(ctx, next) {
 		}
 		const message = [
 			"[access]",
-			ctx.ip || "-",
+			clientIp || ctx.ip || "-",
 			ctx.method,
 			ctx.path,
 			status,
@@ -262,4 +349,4 @@ if (require.main === module) {
 	app.listen(process.env.PORT || 8000);
 }
 
-module.exports = { app, autodiscover, accessLog };
+module.exports = { app, autodiscover, accessLog, getClientIp };

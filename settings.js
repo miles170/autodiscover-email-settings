@@ -4,6 +4,12 @@ module.exports = {
 		url: process.env.SUPPORT_URL
 	},
 	domain: process.env.DOMAIN,
+	realIp: {
+		header: process.env.REAL_IP_HEADER,
+		trustedAddresses: process.env.REAL_IP_TRUSTED_ADDRESSES ?
+			process.env.REAL_IP_TRUSTED_ADDRESSES.split(",").map((s) => s.trim()).filter(Boolean) :
+			[]
+	},
 	imap: {
 		host: process.env.IMAP_HOST,
 		port: process.env.IMAP_PORT,

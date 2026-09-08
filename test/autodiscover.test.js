@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const xmlParser = require("xml-parser");
-const { accessLog, autodiscover } = require("../index.js");
+const { accessLog, autodiscover, app, getClientIp } = require("../index.js");
 const ldap = require("../ldap.js");
 const settings = require("../settings.js");
 
@@ -172,5 +172,149 @@ test("accessLog", async (t) => {
 			);
 		});
 		assert.match(message, / 500 \d+\.\dms - unexpected failure$/);
+	});
+
+	await t.test("resolves client IP when REAL_IP_HEADER is configured", async () => {
+		const originalRealIp = settings.realIp;
+		settings.realIp = { header: "X-Real-Ip", trustedAddresses: [] };
+		try {
+			const req = {
+				method: "POST",
+				url: "/autodiscover/autodiscover.xml",
+				headers: { "x-real-ip": "203.0.113.195" },
+				socket: { remoteAddress: "127.0.0.1" }
+			};
+			const res = { setHeader() {}, statusCode: 200 };
+			const ctx = app.createContext(req, res);
+			ctx.status = 200;
+
+			const message = await capture("info", () => accessLog(ctx, async () => {}));
+			assert.match(message, /^\[access\] 203\.0\.113\.195 POST \/autodiscover\/autodiscover\.xml 200 \d+\.\dms$/);
+			assert.strictEqual(ctx.ip, "203.0.113.195");
+		} finally {
+			settings.realIp = originalRealIp;
+		}
+	});
+
+	await t.test("resolves client IP from trusted reverse proxy address", async () => {
+		const originalRealIp = settings.realIp;
+		settings.realIp = { header: "X-Real-Ip", trustedAddresses: ["127.0.0.1", "172.16.0.0/12"] };
+		try {
+			const req = {
+				method: "POST",
+				url: "/autodiscover/autodiscover.xml",
+				headers: { "x-real-ip": "203.0.113.195" },
+				socket: { remoteAddress: "::ffff:172.18.0.2" }
+			};
+			const res = { setHeader() {}, statusCode: 200 };
+			const ctx = app.createContext(req, res);
+			ctx.status = 200;
+
+			const message = await capture("info", () => accessLog(ctx, async () => {}));
+			assert.match(message, /^\[access\] 203\.0\.113\.195 POST \/autodiscover\/autodiscover\.xml 200 \d+\.\dms$/);
+		} finally {
+			settings.realIp = originalRealIp;
+		}
+	});
+
+	await t.test("rejects proxy headers from untrusted addresses", async () => {
+		const originalRealIp = settings.realIp;
+		settings.realIp = { header: "X-Real-Ip", trustedAddresses: ["172.16.0.0/12"] };
+		try {
+			const req = {
+				method: "POST",
+				url: "/autodiscover/autodiscover.xml",
+				headers: { "x-real-ip": "203.0.113.195" },
+				socket: { remoteAddress: "198.51.100.22" }
+			};
+			const res = { setHeader() {}, statusCode: 200 };
+			const ctx = app.createContext(req, res);
+			ctx.status = 200;
+
+			const message = await capture("info", () => accessLog(ctx, async () => {}));
+			assert.match(message, /^\[access\] 198\.51\.100\.22 POST \/autodiscover\/autodiscover\.xml 200 \d+\.\dms$/);
+		} finally {
+			settings.realIp = originalRealIp;
+		}
+	});
+});
+
+test("getClientIp", async (t) => {
+	await t.test("works with single REAL_IP_HEADER (e.g. X-Real-Ip)", () => {
+		const ctx = {
+			socket: { remoteAddress: "127.0.0.1" },
+			get(name) {
+				return name.toLowerCase() === "x-real-ip" ? "203.0.113.195" : "";
+			}
+		};
+		assert.strictEqual(getClientIp(ctx, { header: "X-Real-Ip", trustedAddresses: [] }), "203.0.113.195");
+	});
+
+	await t.test("defaults to X-Forwarded-For when trustedAddresses is provided without header", () => {
+		const ctx = {
+			socket: { remoteAddress: "10.0.0.5" },
+			get(name) {
+				return name.toLowerCase() === "x-forwarded-for" ? "198.51.100.1, 10.0.0.5" : "";
+			}
+		};
+		assert.strictEqual(getClientIp(ctx, { trustedAddresses: ["10.0.0.0/8"] }), "198.51.100.1");
+	});
+
+	await t.test("supports IPv6 and IPv4 CIDRs in trusted addresses", () => {
+		const ctxIpv4 = {
+			socket: { remoteAddress: "192.168.1.100" },
+			get: () => "203.0.113.5"
+		};
+		assert.strictEqual(getClientIp(ctxIpv4, { header: "X-Real-Ip", trustedAddresses: ["192.168.0.0/16"] }), "203.0.113.5");
+
+		const ctxIpv6 = {
+			socket: { remoteAddress: "::1" },
+			get: () => "203.0.113.6"
+		};
+		assert.strictEqual(getClientIp(ctxIpv6, { header: "X-Real-Ip", trustedAddresses: ["::1"] }), "203.0.113.6");
+	});
+
+	await t.test("falls back to remoteAddress when no proxy settings are configured", () => {
+		const ctx = {
+			socket: { remoteAddress: "192.0.2.1" },
+			get: () => "203.0.113.1"
+		};
+		assert.strictEqual(getClientIp(ctx, { header: undefined, trustedAddresses: [] }), "192.0.2.1");
+	});
+
+	await t.test("prevents spoofing in X-Forwarded-For by selecting furthest untrusted address", () => {
+		const ctx = {
+			socket: { remoteAddress: "10.0.0.5" },
+			get(name) {
+				return name.toLowerCase() === "x-forwarded-for" ? "1.1.1.1, 203.0.113.195, 10.0.0.5" : "";
+			}
+		};
+		assert.strictEqual(getClientIp(ctx, { trustedAddresses: ["10.0.0.0/8"] }), "203.0.113.195");
+	});
+
+	await t.test("matches uncompressed IPv6 address against trusted addresses", () => {
+		const ctx = {
+			socket: { remoteAddress: "0:0:0:0:0:0:0:1" },
+			get: () => "203.0.113.8"
+		};
+		assert.strictEqual(getClientIp(ctx, { header: "X-Real-Ip", trustedAddresses: ["::1"] }), "203.0.113.8");
+	});
+});
+
+test("real_ip settings", async (t) => {
+	const originalEnv = { ...process.env };
+
+	t.afterEach(() => {
+		process.env = { ...originalEnv };
+		delete require.cache[require.resolve("../settings.js")];
+	});
+
+	await t.test("reads REAL_IP_HEADER and REAL_IP_TRUSTED_ADDRESSES", () => {
+		process.env.REAL_IP_HEADER = "X-Real-Ip";
+		process.env.REAL_IP_TRUSTED_ADDRESSES = "127.0.0.1, 10.0.0.0/8, 172.16.0.0/12";
+		delete require.cache[require.resolve("../settings.js")];
+		const current = require("../settings.js");
+		assert.strictEqual(current.realIp.header, "X-Real-Ip");
+		assert.deepStrictEqual(current.realIp.trustedAddresses, ["127.0.0.1", "10.0.0.0/8", "172.16.0.0/12"]);
 	});
 });

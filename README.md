@@ -314,6 +314,26 @@ environment:
 
 Each HTTP request logs its source IP, method, path, response status, and duration. Autodiscover requests also log the `DisplayName` returned to the client. Unmatched routes, invalid XML, requests without an email address, and unexpected errors are logged at warning or error level with a reason and the request body. Logged bodies are escaped onto one line, limited to 2,000 characters, and redact password, secret, and token elements.
 
+#### Reverse proxy configuration
+
+When deployed behind a reverse proxy (e.g. Nginx, Traefik, or HAProxy), the client IP can be resolved from reverse proxy headers:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `REAL_IP_HEADER` | Request header to read the client IP from (e.g. `X-Real-IP`, `X-Forwarded-For`) | |
+| `REAL_IP_TRUSTED_ADDRESSES` | Comma-separated list of trusted upstream proxy IPs or CIDRs (e.g. `127.0.0.1, 10.0.0.0/8, 172.16.0.0/12`) | |
+
+- Setting `REAL_IP_HEADER=X-Real-Ip` is all that is required to capture the client IP from `X-Real-Ip`.
+- Setting `REAL_IP_TRUSTED_ADDRESSES` optionally restricts which upstream proxy IPs are trusted to send that header (rejecting headers from untrusted direct clients).
+
+Example with Nginx (`proxy_set_header X-Real-IP $remote_addr;`):
+
+```yaml
+environment:
+  REAL_IP_HEADER: "X-Real-IP"
+  REAL_IP_TRUSTED_ADDRESSES: "127.0.0.1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16"
+```
+
 ## Credits
 
 Inspired from <https://github.com/sylvaindumont/autodiscover.xml>, but without the few restrictions mentioned in the original project notes and with a simple support page to allow manual setup and iOS profile download.
