@@ -318,3 +318,86 @@ test("real_ip settings", async (t) => {
 		assert.deepStrictEqual(current.realIp.trustedAddresses, ["127.0.0.1", "10.0.0.0/8", "172.16.0.0/12"]);
 	});
 });
+
+test("routes", async (t) => {
+	const http = require("node:http");
+	const server = http.createServer(app.callback());
+	await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+	const port = server.address().port;
+	const baseUrl = `http://127.0.0.1:${port}`;
+
+	t.after(() => {
+		server.closeAllConnections?.();
+		server.close();
+	});
+
+	await t.test("GET / returns 404", async () => {
+		const res = await fetch(`${baseUrl}/`);
+		assert.strictEqual(res.status, 404);
+	});
+
+	await t.test("POST / returns 404", async () => {
+		const res = await fetch(`${baseUrl}/`, { method: "POST" });
+		assert.strictEqual(res.status, 404);
+	});
+
+	await t.test("GET /favicon.ico returns 404", async () => {
+		const res = await fetch(`${baseUrl}/favicon.ico`);
+		assert.strictEqual(res.status, 404);
+	});
+
+	await t.test("GET /mail/config-v1.1.xml returns autoconfig XML", async () => {
+		const res = await fetch(`${baseUrl}/mail/config-v1.1.xml`);
+		assert.strictEqual(res.status, 200);
+		assert.strictEqual(res.headers.get("content-type"), "application/xml");
+		const text = await res.text();
+		assert.ok(text.includes("<clientConfig version=\"1.1\">"));
+	});
+
+	await t.test("GET /autodiscover/autodiscover.xml returns autodiscover XML", async () => {
+		const res = await fetch(`${baseUrl}/autodiscover/autodiscover.xml`);
+		assert.strictEqual(res.status, 200);
+		assert.strictEqual(res.headers.get("content-type"), "application/xml");
+		const text = await res.text();
+		assert.ok(text.includes("<Autodiscover"));
+	});
+
+	await t.test("POST /autodiscover/autodiscover.xml returns autodiscover XML", async () => {
+		const res = await fetch(`${baseUrl}/autodiscover/autodiscover.xml`, {
+			method: "POST",
+			headers: { "content-type": "text/xml" },
+			body: "<Autodiscover><Request><EMailAddress>user@example.com</EMailAddress></Request></Autodiscover>"
+		});
+		assert.strictEqual(res.status, 200);
+		assert.strictEqual(res.headers.get("content-type"), "application/xml");
+		const text = await res.text();
+		assert.ok(text.includes("<Autodiscover"));
+		assert.ok(text.includes("<DisplayName>user@example.com</DisplayName>"));
+	});
+
+	await t.test("GET and POST /Autodiscover/Autodiscover.xml handle PascalCase route", async () => {
+		const getRes = await fetch(`${baseUrl}/Autodiscover/Autodiscover.xml`);
+		assert.strictEqual(getRes.status, 200);
+
+		const postRes = await fetch(`${baseUrl}/Autodiscover/Autodiscover.xml`, {
+			method: "POST",
+			headers: { "content-type": "text/xml" },
+			body: "<Autodiscover><Request><EMailAddress>user@example.com</EMailAddress></Request></Autodiscover>"
+		});
+		assert.strictEqual(postRes.status, 200);
+	});
+
+	await t.test("GET /email.mobileconfig returns mobileconfig file", async () => {
+		const res = await fetch(`${baseUrl}/email.mobileconfig?email=user@example.com`);
+		assert.strictEqual(res.status, 200);
+		assert.strictEqual(res.headers.get("content-type"), "application/x-apple-aspen-config; charset=utf-8");
+		const text = await res.text();
+		assert.ok(text.includes("<plist version=\"1.0\">"));
+	});
+
+	await t.test("GET /email.mobileconfig returns 400 when email is missing", async () => {
+		const res = await fetch(`${baseUrl}/email.mobileconfig`);
+		assert.strictEqual(res.status, 400);
+	});
+});
+

@@ -1,6 +1,5 @@
 "use strict";
 
-const fs		= require("fs");
 const net		= require("node:net");
 const path		= require("path");
 const util		= require("util");
@@ -301,17 +300,6 @@ router.get("/email.mobileconfig", async (ctx) => {
 		smtpssl,
 		ldapssl
 	});
-});
-
-
-// Generic support page
-router.get("/", async (ctx) => {
-	await ctx.render("index.html");
-});
-
-router.get("/favicon.ico", async (ctx) => {
-	ctx.type = "image/x-icon";
-	ctx.body = fs.createReadStream(path.join(__dirname, "views", "favicon.ico"));
 });
 
 // XML body parser middleware

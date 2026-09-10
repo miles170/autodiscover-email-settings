@@ -9,12 +9,6 @@ This service is created to autodiscover your provider email settings.
 
 It provides IMAP/POP/SMTP/LDAP Autodiscover capabilities on Microsoft Outlook/Apple Mail, Autoconfig capabilities for Thunderbird, and Configuration Profiles for iOS/Apple Mail.
 
-**A simple support page is also available at the root of the autodiscover domain.**
-
-![General settings](docs/screenshot_01.png)
-
-![General settings](docs/screenshot_02.png)
-
 ## DNS settings
 
     autoconfig              IN      A      {{$AUTODISCOVER_IP}}
@@ -336,7 +330,7 @@ environment:
 
 ## Credits
 
-Inspired from <https://github.com/sylvaindumont/autodiscover.xml>, but without the few restrictions mentioned in the original project notes and with a simple support page to allow manual setup and iOS profile download.
+Inspired from <https://github.com/sylvaindumont/autodiscover.xml>, but without the few restrictions mentioned in the original project notes.
 
 The original project was inspired from <https://github.com/johansmitsnl/docker-email-autodiscover>, but with <https://github.com/Tiliq/autodiscover.xml> instead of <https://github.com/gronke/email-autodiscover> to allow a much lighter image based of node on alpine instead of apache on debian.
 
@@ -357,8 +351,6 @@ The above autoconfiguration methods assume the following:
 -   Apple [ConfigurationProfile reference](https://developer.apple.com/library/archive/featuredarticles/iPhoneConfigurationProfileRef/index.html)
 
 -   [DNS SRV Records for LDAP](https://github.com/doctorjbeam/LDAPAutoDiscover)
-
--   [Bootstrap](https://getbootstrap.com/), [jQuery](https://jquery.com/) and [Popper.js](https://popper.js.org/) used for default support page
 
 ## License
 

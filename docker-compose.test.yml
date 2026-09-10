@@ -55,8 +55,8 @@ services:
       - DOCKER_TEST_CONTAINER=autodiscover
       - DOCKER_WEB_CONTAINER=autodiscover
       - DOCKER_WEB_PORT=8000
-      - DOCKER_WEB_HEALTH_API=
-      - DOCKER_WEB_HEALTH_RESULT=Generic settings
+      - DOCKER_WEB_HEALTH_API=mail/config-v1.1.xml
+      - DOCKER_WEB_HEALTH_RESULT=clientConfig
     volumes_from:
       - autodiscover
     # If you want, you can sync time & timezone with host
